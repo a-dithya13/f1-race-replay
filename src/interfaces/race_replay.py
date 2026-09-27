@@ -4,7 +4,10 @@ import arcade
 import numpy as np
 from scipy.spatial import cKDTree
 from src.f1_data import FPS
+from src.driver_stats import get_complete_driver_info
+from src.driver_popup import DriverPopup
 from src.ui_components import (
+
     LeaderboardComponent, 
     WeatherComponent, 
     LegendComponent, 
@@ -223,6 +226,9 @@ class F1RaceReplayWindow(arcade.Window):
         # Selection & hit-testing state for leaderboard
         self.selected_driver = None
         self.leaderboard_rects = []  # list of tuples: (code, left, bottom, right, top)
+        # Driver statistics popup
+        self.driver_popup = DriverPopup(self.width, self.height)
+        self.current_session_key = None
         # store previous leaderboard order for up/down arrows
         self.last_leaderboard_order = None
         
@@ -1671,20 +1677,45 @@ class F1RaceReplayWindow(arcade.Window):
             self.paused = self.was_paused_before_hold
 
     def on_mouse_press(self, x: float, y: float, button: int, modifiers: int):
-        # forward to components; stop at first that handled it
+        # Handle driver popup first
+        if self.driver_popup.visible:
+            if self.driver_popup.is_close_button_clicked(x, y):
+                self.driver_popup.hide()
+                return
+
+            if not self.driver_popup.is_popup_clicked(x, y):
+                self.driver_popup.hide()
+                return
+
+            return
+
+        # Forward to components; stop at first that handled it
         if self.controls_popup_comp.on_mouse_press(self, x, y, button, modifiers):
             return
+
         if self.race_controls_comp.on_mouse_press(self, x, y, button, modifiers):
             return
+
         if self.progress_bar_comp.on_mouse_press(self, x, y, button, modifiers):
             return
+
         if self.leaderboard_comp.on_mouse_press(self, x, y, button, modifiers):
+            if self.selected_driver:
+                driver_info = get_complete_driver_info(
+                    self.selected_driver,
+                    self.current_session_key
+                )
+
+                if driver_info:
+                    self.driver_popup.show(driver_info)
+
             return
+
         if self.legend_comp.on_mouse_press(self, x, y, button, modifiers):
             return
-        # default: clear selection if clicked elsewhere
+
+        # Default: clear selection if clicked elsewhere
         self.selected_driver = None
-        
     def on_mouse_motion(self, x: float, y: float, dx: float, dy: float):
         """Handle mouse motion for hover effects on progress bar and controls."""
         self.progress_bar_comp.on_mouse_motion(self, x, y, dx, dy)
